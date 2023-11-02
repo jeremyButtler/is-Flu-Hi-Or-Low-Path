@@ -34,6 +34,9 @@ Also, I should note that I am not a flu person. I just
   heard people might be interested in a program like this.
   And that there used to be one, but it disappeared.
 
+This code is licensed under two licenses, MIT and CC0. Pick
+  the licenses that works best for you.
+
 ## References
 
 Kalthoff D, Globig A, Beer M. (Highly pathogenic) avian
