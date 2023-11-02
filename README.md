@@ -247,4 +247,4 @@ I might try to see if there is a consensus for the start of
 
 # Funding
 
-- Need to find out how funded any pay checks I might get.
+- Will add in later.
