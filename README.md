@@ -236,7 +236,8 @@ I might try to see if there is a consensus for the start of
   and support.
 - To Eric Bortz (one of my mentors) for mentioning that
   this might be a good idea to code up. And also provided
-  some suggestions.
+  insight into how to determine if a flu was high path or
+  low path.
 - NCBI genbank for having a resource were I could grab a
   couple example flu genomes from.
 - Who knows how many answered questions on stack overflow
