@@ -4,9 +4,13 @@
 #  - Holds the function to get the HA2 starting position
 #    from a feature table
 # Libraries:
-#  - "seqStruct.h"         (No .c file)
-#  - "cStrToNumberFun.h"   (No .c file)
-#  o "dataTypeShortHand.h" (No .c file)
+#  - "alnSeq/memWater.h"        (No .c file)
+#  o "dataTypeShortHand.h"      (No .c file)
+#  o "alnSeq/seqStruct.h"       (No .c file)
+#  o "alnSeq/generalAlnFun.h"   (No .c file)
+#  o "alnSeq/alnSetStruct.h"    (No .c file)
+#  o "alnSeq/alnSeqDefaults.h"  (No .c file)
+#  o "alnSeq/cStrToNumberFun.h" (No .c file)
 # C Standard Libraries:
 #  - <string.h>
 #  o <stdlib.h>
@@ -35,8 +39,7 @@
 #define GET_HA_START_H
 
 #include <string.h>
-#include "cStrToNumberFun.h"
-#include "seqStruct.h"
+#include "alnSeq/memWater.h"
 
 /*--------------------------------------------------------\
 | Name: getHA2Start
@@ -259,7 +262,6 @@ static inline ulong getHA2Start(
    return startUL - 1; /*Convert to index 0*/
 } /*getHA2Start*/
 
-
 /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\
 ' Name: getHaSeq
 ' Use:
@@ -272,7 +274,7 @@ static inline ulong getHA2Start(
 '    o seqStruct with the fasta sequence (seqST->seqCStr).
 '    o 0 if no HA sequence was found
 \~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
-static seqStruct * getHaSeq(
+static inline seqStruct * getHaSeq(
    char *pathToHaFastaStr/*Path to fasta with HA sequence*/
 ){ /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\
    ' Fun-02 TOC: getHaSeq
@@ -308,5 +310,81 @@ static seqStruct * getHaSeq(
    freeSeqST(seqST, 1); /*1 = Struct on head*/
    return 0;
 } /*getHaSeq*/
+
+/*--------------------------------------------------------\
+| Name: findHA2Start
+| Use:
+|  - Finds the starting position of the HA2 gene in a
+|    sequence (this assumes it is an HA sequence)
+| Input:
+|  - seqStr:
+|    o c-string with sequence to find HA2 start in.
+|  - lenSeqUL:
+|    o length of seqStr (index 1)
+|  - retHA2StartUL:
+|    o this will hold the start position of the HA2 gene
+|      in seqStr (index 0) (The starting position is a
+|      best guess. However, it could be wrong.
+|  - retConStartUL:
+|    o This will report the frist mapped base in the
+|      consensus (index 0; first three bases are P1)
+| Output:
+|  - Modifies:
+|    o retHA2StartUL to hold the found HA2 position in
+|      seqStr (index 0)
+|    o retConStartUL to hold the first mapped base in the
+|      consensus (index 0) 
+|  - Returns:
+|    o Score for the alignment
+|    o 0 if the alignment is beneath the min score
+|    o -1 if had a memory error
+\--------------------------------------------------------*/
+static inline long findHA2Start(
+   char *seqStr,         /*Sequence to find HA2 position*/
+   ulong lenSeqUL,       /*Length of seqStr (index 1)*/
+   ulong *retHA2StartUL, /*Start of HA2 on input sequence*/
+   ulong *retConStartUL  /*First mapped base in consensus*/
+){ /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\
+   ' Fun-03 TOC: findHA2Start
+   '  - Finds the HA2 start position by doing an waterman
+   '    alignment against a consensus sequence.
+   \~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+    char HA2ConStr[] = "arrGGNHTNYHNrGNGCNDWHrYNrKNYKBAT";
+    ulong lenHA2ConUL = 32;
+
+    long scoreL = 0;
+    struct alnSet settings;
+
+
+    initAlnSet(&settings);
+
+    *retHA2StartUL = 0;
+    *retConStartUL = 0;
+
+    /*This step speeds things up a bit*/
+    seqToLookupIndex(seqStr);
+    seqToLookupIndex(HA2ConStr);
+
+    scoreL =
+       memWaterAln( /*Returns the best score or 0*/
+          HA2ConStr,    /*HA2 consensus (hardcoded in)*/
+          lenHA2ConUL,  /*Length HA2 consensus (hardcode)*/
+          seqStr,       /*Input sequence*/
+          lenSeqUL,     /*Length of the input sequence*/
+          &settings,    /*Has the settings for alignment*/
+          retConStartUL,/*First mapped base in consensus*/
+          retHA2StartUL /*Start of HA2 on input sequence*/
+       );
+    /*HA2ConStr and lenHA2ConUL are at the top of this 
+    ` file in the header: section
+    */
+
+    lookupIndexToSeq(seqStr);
+
+    if(scoreL < 0) return -1;          /*Memory error*/
+    if(scoreL < defMinScore) return 0; /*No good answer*/
+    return scoreL;
+} /*findHA2Start*/
 
 #endif

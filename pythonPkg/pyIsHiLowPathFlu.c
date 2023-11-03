@@ -26,13 +26,16 @@
 '    - Has includes and default variables
 '  o fun-01 isHiOrLowPathFlu:
 '    - Determines if flu strain is a hi or low path strain
+'  o fun-02 findHA2StartPos:
+'    - Find the starting position of the HA cleavege site
+'      in the HA gene by aligining it to an HA2 consensus
 '  o struct-01 isHiLowPathFluST:
 '    - Python object to hold informaton about each function
 '      in this script
 '  o struct-02 isHiLowPathModule:
 '    - Python object holding the information for this
 '      library
-'  o fun-02 PyInit_fluHiLowPath:
+'  o fun-03 PyInit_fluHiLowPath:
 '    - Python function to initialize this libarary
 \~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
 
@@ -235,6 +238,66 @@ static PyObject *hiOrLowPathHA(
 } /*isHiOrLowPathFlu*/
 
 /*--------------------------------------------------------\
+| Name: findHA2StartPos
+| Use:
+|  - Find the starting position of the HA cleavege site in
+|    the HA gene by aligining it to an HA2 consensus
+| Input:
+|  - seqStr:
+|    o The sequence to find the HA cleaved site in.
+| Output:
+|  - Returns:
+|    o A list with the HA2 starting position (index 0) and
+|      score for the alignment.
+|    o If the alignment did not meet the min score, then
+|      the starting position is set to -1 (low score) or
+|      -2 (could not align the P1 position) and the
+|      score is set to 0.
+\--------------------------------------------------------*/
+static PyObject * findHA2StartPos(
+   PyObject *self,
+   PyObject *args
+){ /*~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~\
+   ' Fun-02 TOC: findHA2StartPos
+   '  - Find the HA2 start position in an HA seqence
+   \~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~*/
+
+    char *seqStr = 0;
+    ulong lenSeqUL = 0;
+
+    long scoreL = 0;         /*Alignment score*/
+    ulong HA2StartUL = 0;    /*Starting position of HA2*/
+    ulong conPosUL = 0;      /*1st aligned consensus base*/
+    ulong errUL = 0;         /*Error from ParseTuple*/
+    
+    errUL =
+       PyArg_ParseTuple(args,"s#",&seqStr,&lenSeqUL);
+
+    if(!errUL)
+    { /*If: I had an error*/
+      PyErr_SetString(PyExc_ValueError, "Nothing input\n");
+      return NULL;
+    } /*If: I had an error*/
+
+    scoreL = 
+       findHA2Start(seqStr,lenSeqUL,&HA2StartUL,&conPosUL);
+       /*Find the starting position*/
+
+    if(scoreL < 0)
+    { /*If: I had a memory error*/
+       PyErr_NoMemory();
+       return NULL;
+    } /*If: I had a memory error*/
+
+    if(scoreL == 0) return Py_BuildValue("[ll]", -1, 0);
+    if(conPosUL > 0) return Py_BuildValue("[ll]", -2, 0);
+
+    HA2StartUL += 3; /*Move to the first base in P1'*/
+    return Py_BuildValue("[ll]",(long) HA2StartUL,scoreL);
+      /*I will never fill a long here*/
+} /*findHA2StartPos*/
+
+/*--------------------------------------------------------\
 | Struct-01 isHiLowPathFluST:
 |  - Python object to hold informaton about each function
 |    in this script
@@ -280,6 +343,30 @@ static PyMethodDef isHiLowPathFluST[]=
        " /*Documenation*/
    },
 
+   {
+      "findHA2StartPos",
+      findHA2StartPos,
+      METH_VARARGS,   /*Only one input option*/
+      "findHA2StartPos(sequence)\n\
+       Use:\n\
+         - Find the starting position of the HA cleavege\n\
+           site in the HA gene by aligining it to an HA2\n\
+           consensus \n\
+         - Consensus = arrGGNHTNYHNrGNGCNDWHrYNrKNYKBAT\n\
+       Input:\n\
+         - seqStr:\n\
+           o The sequence to find the HA cleaved site in\n\
+       Output:\n\
+         - Returns:\n\
+           o A list with the HA2 starting position\n\
+             (index 0) and score for the alignment.\n\
+           o If the alignment did not meet the min\n\
+             score, then the starting position is set to\n\
+             -1 (low score) or -2 (could not align the \n\
+             P1 position) and the score is set to 0.\n\
+     " /*Documentation*/
+   },
+
    {NULL, NULL, 0, NULL} /*Empty/NULL entry*/
 }; /*isHiLowPathFluST*/
 
@@ -299,7 +386,7 @@ static struct PyModuleDef isHiLowPathModule = {
 };
 
 /*--------------------------------------------------------\
-| Fun-02: PyInit_fluHiLowPath
+| Fun-03: PyInit_fluHiLowPath
 |  - Python function to initialize this libarary
 \--------------------------------------------------------*/
 PyMODINIT_FUNC PyInit_checkFluHiOrLowPath(void)

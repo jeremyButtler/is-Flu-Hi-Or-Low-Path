@@ -4,12 +4,16 @@
 #  - Determines if a flu strain is high or low path by the
 #    P1 to P6 amino acids in the HA gene
 # Libraries
-#  - "hiLowPathFun.h"      (No .c file)
-#  - "getHA2Start.h"       (No .c file)
-#  o "dataTypeShortHand.h" (No .c file)
-#  o "hiLowPathTbls.h"     (No .c file)
-#  o "cStrToNumberFun.h"   (No .c file)
-#  o "seqStruct.h"         (No .c file)
+#  - "hiLowPathFun.h"           (No .c file)
+#  - "getHA2Start.h"            (No .c file)
+#  o "dataTypeShortHand.h"      (No .c file)
+#  o "hiLowPathTbls.h"          (No .c file)
+#  o "alnSeq/memWater.h"        (No .c file)
+#  o "alnSeq/cStrToNumberFun.h" (No .c file)
+#  o "alnSeq/seqStruct.h"       (No .c file)
+#  o "alnSeq/generalAlnFun.h"   (No .c file)
+#  o "alnSeq/alnSetStruct.h"    (No .c file)
+#  o "alnSeq/alnSeqDefaults.h"  (No .c file)
 # C Stanard Libraries:
 #  o <stdlib.h>
 #  o <sdtio.h>
@@ -135,8 +139,12 @@ int main(
    char *outHiLowStr = "";
    char *outP2VirlStr = "";
 
+   long HA2AlnScoreL = 0; /*Alignment score for HA2*/
    ulong HA2StartUL = 0;
+   ulong HA2ConFirstBaseUL = 0;
+
    struct seqStruct *seqST = 0;
+   struct seqStruct seqStackST;
 
    FILE *testFILE = 0;
    FILE *outFILE = stdout;
@@ -154,6 +162,8 @@ int main(
    ^  o main sec-03 sub-02:
    ^    - Check if feature table can be opened
    \>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>*/
+
+    initSeqST(&seqStackST);
 
     errStr =
        getUserInput(
@@ -229,7 +239,7 @@ int main(
    *  - Check if the feature table file can be opened
    \******************************************************/
 
-   if(HA2StartUL == 0)
+   if(HA2StartUL == 0 && featureTblStr != 0)
    { /*If: user did not provide the HA2 start position*/
       testFILE = fopen(featureTblStr, "r");
 
@@ -250,20 +260,11 @@ int main(
 
    /*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\
    ^ Main Sec-04:
-   ^  - Get HA2 staring position and HA sequence
-   ^  o main sec-03 sub-01:
-   ^    - Get HA2 starting position
-   ^  o main sec-03 sub-02:
-   ^    - Get the HA sequence
+   ^  - Get HA2 staring position
    \>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>*/
 
-   /******************************************************\
-   * Main Sec-04 Sub-01:
-   *  - Get the HA2 starting position
-   \******************************************************/
-
    /*Check if the user already provided this*/
-   if(HA2StartUL == 0)
+   if(HA2StartUL == 0 && featureTblStr != 0)
    { /*If: the user did not provided the HA2 start*/
       HA2StartUL = getHA2Start(featureTblStr);
 
@@ -279,94 +280,265 @@ int main(
       } /*If: I could not extract HA2 starting position*/
    } /*If: the user did not provided the HA2 start*/
 
-   /******************************************************\
-   * Main Sec-04 Sub-02:
-   *  - Get the HA sequence
-   \******************************************************/
-
-    seqST = getHaSeq(fastaStr);
-
-    if(seqST == 0)
-    { /*If: I could not find the HA sequence*/
-      fprintf(
-         stderr,
-         "Could not find the HA sequence in %s\n",
-         fastaStr
-      );
-
-      exit(-1);
-    } /*If: I could not find the HA sequence*/
-
    /*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\
    ^ Main Sec-05:
-   ^  - Find if hi path/low path and virulence by P1 to P6
+   ^  - Use HA2 start position to get if high/low path
    ^  o main sec-05 sub-01:
+   ^    - Get the HA sequence (if have a start position)
+   ^  o main sec-05 sub-02:
    ^    - Get the P1 to P6 amino acid sequence
-   ^  o main sec-05 sub-02:
-   ^    - Check high path/low path & other P1 to P6 markers
-   ^  o main sec-05 sub-02:
+   ^  o main sec-05 sub-03:
+   ^    - Check high path/low path & other P1-P6 markers
+   ^  o main sec-05 sub-04:
    ^    - Print out the results
+   ^  o main sec-05 sub-05:
+   ^    - Cean up and exit
    \<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
 
-   /******************************************************\
-   * Main Sec-05 Sub-01:
-   *    - Get the P1 to P6 amino acid sequence
-   \******************************************************/
+    /*****************************************************\
+    * Main Sec-05 Sub-01:
+    *  - Get the HA sequence (if have a start position)
+    \*****************************************************/
 
-    p1ToP6AaStr = getP1ToP6AA(seqST->seqCStr, HA2StartUL);
+    if(HA2StartUL)
+    { /*If: have an HA2 starting position*/
+       seqST = getHaSeq(fastaStr);
 
-    if(p1ToP6AaStr == 0)
-    { /*If: had a memory error*/
-       fprintf(stderr, "Ran out of memory\n");
-       exit(-1);
-    } /*If: had a memory error*/
+       if(seqST == 0)
+       { /*If: I could not find the HA sequence*/
+         freeSeqST(seqST, 1); /*1 for struct on heap*/
 
+         fprintf(
+            stderr,
+            "Could not find the HA sequence in %s\n",
+            fastaStr
+         );
 
-   /******************************************************\
-   * Main Sec-05 Sub-02:
-   *  - Check high path/low path & other P1 to P6 markers
-   \******************************************************/
+         exit(-1);
+       } /*If: I could not find the HA sequence*/
 
-    hiPathBl = isHiOrLowPath(p1ToP6AaStr);
+      /***************************************************\
+      * Main Sec-05 Sub-02:
+      *  - Get the P1 to P6 amino acid sequence
+      \***************************************************/
 
-    if(hiPathBl) outHiLowStr = "high_path";
-    else outHiLowStr = "low_path";
+       p1ToP6AaStr =
+          getP1ToP6AA(seqST->seqCStr, HA2StartUL);
 
-    p2VirulBl = isP2PheTryMut(p1ToP6AaStr);
+       if(p1ToP6AaStr == 0)
+       { /*If: had a memory error*/
+          freeSeqST(seqST, 1); /*1 for struct on heap*/
+          fprintf(stderr, "Ran out of memory\n");
+          exit(-1);
+       } /*If: had a memory error*/
 
-    if(p2VirulBl) outP2VirlStr = "P2=True";
-    else outP2VirlStr = "P2=False";
+      /***************************************************\
+      * Main Sec-05 Sub-03:
+      *  - Check high path/low path & other P1-P6 markers
+      \***************************************************/
 
-   /******************************************************\
-   * Main Sec-05 Sub-03:
-   *  - Print out the results
-   \******************************************************/
+       hiPathBl = isHiOrLowPath(p1ToP6AaStr);
 
-    /*Get rid of new line at end of header*/
-    *(seqST->idCStr + seqST->lenIdUL - 1) = '\0';
+       if(hiPathBl) outHiLowStr = "high_path";
+       else outHiLowStr = "low_path";
 
-    fprintf(
-       outFILE,
-       "%s\t%s\t%s\tP1'-%c-%c-%c-%c-%c-%c\n",
-       &seqST->idCStr[1], /*[0] is >*/
-       outHiLowStr,
-       outP2VirlStr,
-       p1ToP6AaStr[0],
-       p1ToP6AaStr[1],
-       p1ToP6AaStr[2],
-       p1ToP6AaStr[3],
-       p1ToP6AaStr[4],
-       p1ToP6AaStr[5]
-    );
+       p2VirulBl = isP2PheTryMut(p1ToP6AaStr);
+
+       if(p2VirulBl) outP2VirlStr = "P2=True";
+       else outP2VirlStr = "P2=False";
+
+      /***************************************************\
+      * Main Sec-05 Sub-04:
+      *  - Print out the results
+      \***************************************************/
+
+       /*Get rid of new line at end of header*/
+       *(seqST->idCStr + seqST->lenIdUL - 1) = '\0';
+
+       fprintf(
+          outFILE,
+          "%s\t%s\t%s\tP1'-%c-%c-%c-%c-%c-%c\t%lu\n",
+          &seqST->idCStr[1], /*[0] is >*/
+          outHiLowStr,
+          outP2VirlStr,
+          p1ToP6AaStr[0],
+          p1ToP6AaStr[1],
+          p1ToP6AaStr[2],
+          p1ToP6AaStr[3],
+          p1ToP6AaStr[4],
+          p1ToP6AaStr[5],
+          HA2StartUL + 1   /*Convert to index 1*/
+       );
+
+       /***************************************************\
+       * Main Sec-05 Sub-05:
+       *  - Clean up and exit
+       \***************************************************/
+
+        freeSeqST(seqST, 1); /*1 for struct on heap*/
+        free(p1ToP6AaStr);
+        p1ToP6AaStr = 0;
+        exit(0);
+    } /*If: have an HA2 starting position*/
 
    /*>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>>\
    ^ Main Sec-06:
-   ^  - Clean up and exit
+   ^  - Find HA2 start & then if high/low path
+   ^  o main sec-05 sub-01:
+   ^    - Open file and read in all sequences
+   ^  o main sec-05 sub-02:
+   ^    - Check if the sequence maps to the HA2 consensus
+   ^  o main sec-05 sub-03:
+   ^    - Check if have all thre bases in the P1 position
+   ^      and if so, move to P1'
+   ^  o main sec-05 sub-04:
+   ^    - Get the P1 to P6 amino acid sequence
+   ^  o main sec-05 sub-05:
+   ^    - Check high path/low path & other P1-P6 markers
+   ^  o main sec-05 sub-06:
+   ^    - Print out the results
+   ^  o main sec-05 sub-07:
+   ^    - Clean up and exit
    \<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<<*/
 
-    freeSeqST(seqST, 1); /*1 for struct on heap*/
-    free(p1ToP6AaStr);
-    p1ToP6AaStr = 0;
+   /******************************************************\
+   * Main Sec-06 Sub-01:
+   *  - Open file and read in all sequences
+   \******************************************************/
+
+   testFILE = fopen(fastaStr, "r");
+
+   while(readFaSeq(testFILE, &seqStackST))
+   { /*Loop: Get each sequence & check if high/low path*/
+
+       /*Get rid of new line at end of header*/
+       *(seqStackST.idCStr + seqStackST.lenIdUL - 1) ='\0';
+
+      /***************************************************\
+      * Main Sec-06 Sub-02:
+      *  - Check if the sequence maps to the HA2 consensus
+      \***************************************************/
+
+       HA2AlnScoreL =
+          findHA2Start(
+             seqStackST.seqCStr,
+             seqStackST.lenSeqUL,
+             &HA2StartUL,
+             &HA2ConFirstBaseUL
+      ); /*Find the HA2 starting position*/
+
+      if(HA2AlnScoreL < 0)
+      { /*If: had a memory error*/
+         freeSeqST(&seqStackST, 0);/*0 struct is on stack*/
+         fclose(testFILE);
+
+         fprintf(stderr, "Ran out of memory\n");
+         exit(-1);
+      } /*If: had a memory error*/
+
+      /*check if this aligment met the minimum score*/
+      if(HA2AlnScoreL == 0)
+      { /*If: the sequence did not map, let user know*/
+         fprintf(
+            outFILE,
+            "%s\tNA\tNA\tNo-alignment\tNA\n",
+            &seqStackST.idCStr[1] /*Skip > at start*/
+         );
+
+         continue;
+      } /*If: the sequence did not map, let user know*/
+
+      /***************************************************\
+      * Main Sec-06 Sub-03:
+      *  - Check if have all thre bases in the P1 position
+      *    and if so, move to P1'
+      \***************************************************/
+
+
+      /*If the first base in the P1 codon did not map,
+      ` This means it is not a lysine or argine and so, is
+      ` likely not the start of the HA2 sequence
+      */
+      if(HA2ConFirstBaseUL > 0)
+      { /*If: the 1st base in the P1 codon did not map*/
+         /*See if we can find P1' (print out for user*/
+         if(HA2ConFirstBaseUL < 2) HA2StartUL += 3;
+
+         fprintf(
+            outFILE,
+            "%s\tNA\tNA\tMissing_1st_P1_base\t%lu\n",
+            &seqStackST.idCStr[1], /*Skip > at start*/
+            HA2StartUL + 1         /*Convert to index 1*/
+         );
+
+         continue;
+      } /*If: the 1st base in the P1 codon did not map*/
+
+      HA2StartUL += 3; /*1st 3 bases is P1, I need P1'*/
+
+      /***************************************************\
+      * Main Sec-06 Sub-04:
+      *  - Get the P1 to P6 amino acid sequence
+      \***************************************************/
+
+       p1ToP6AaStr =
+          getP1ToP6AA(seqStackST.seqCStr, HA2StartUL);
+
+       if(p1ToP6AaStr == 0)
+       { /*If: had a memory error*/
+         freeSeqST(&seqStackST, 0);/*0 struct is on stack*/
+         fclose(testFILE);
+
+         fprintf(stderr, "Ran out of memory\n");
+         exit(-1);
+       } /*If: had a memory error*/
+
+      /***************************************************\
+      * Main Sec-06 Sub-05:
+      *  - Check high path/low path & other P1-P6 markers
+      \***************************************************/
+
+       hiPathBl = isHiOrLowPath(p1ToP6AaStr);
+
+       if(hiPathBl) outHiLowStr = "high_path";
+       else outHiLowStr = "low_path";
+
+       p2VirulBl = isP2PheTryMut(p1ToP6AaStr);
+
+       if(p2VirulBl) outP2VirlStr = "P2=True";
+       else outP2VirlStr = "P2=False";
+
+      /***************************************************\
+      * Main Sec-06 Sub-06:
+      *  - Print out the results
+      \***************************************************/
+
+       fprintf(
+          outFILE,
+          "%s\t%s\t%s\tP1'-%c-%c-%c-%c-%c-%c\t%lu\n",
+          &seqStackST.idCStr[1], /*[0] is >*/
+          outHiLowStr,
+          outP2VirlStr,
+          p1ToP6AaStr[0],
+          p1ToP6AaStr[1],
+          p1ToP6AaStr[2],
+          p1ToP6AaStr[3],
+          p1ToP6AaStr[4],
+          p1ToP6AaStr[5],
+          HA2StartUL + 1  /*Convert to index 1*/
+       );
+
+       free(p1ToP6AaStr); /*No longer need*/
+       p1ToP6AaStr = 0;
+    } /*Loop: Get each sequence & check if high/low path*/
+
+    /***************************************************\
+    * Main Sec-06 Sub-07:
+    *  - Clean up and exit
+    \***************************************************/
+
+    fclose(testFILE);
+    freeSeqST(&seqStackST, 0); /*0 for struct on stach*/
     exit(0);
 } /*main*/
 
@@ -500,7 +672,26 @@ void pHelpMesg(
 
    fprintf(outFILE, "Input:\n");
 
-   fprintf(outFILE, "  -tbl: [Required]\n");
+   fprintf(outFILE, "  -fasta: [Required]\n");
+   fprintf(
+      outFILE,
+      "    o Fasta file with HA sequence to check\n"
+   );
+   fprintf(
+     outFILE,
+     "    o If you are using a table or inputing the HA2\n"
+   );
+   fprintf(
+    outFILE,
+    "      starting position, then the HA sequence needs\n"
+   );
+   fprintf(
+      outFILE,
+      "      to be marked with \"HA\" in the header (>)\n"
+   );
+
+
+   fprintf(outFILE, "  -tbl: [Optional]\n");
    fprintf(outFILE, "    o Feature table from\n      ");
    fprintf(
      outFILE,
@@ -509,19 +700,8 @@ void pHelpMesg(
    fprintf(outFILE, "\n");
    fprintf(
       outFILE,
-      "    o This can be replaced with -HA2-start\n"
+      "    o This is more reliable than an alignment\n"
    );
-
-   fprintf(outFILE, "  -fasta: [Required]\n");
-   fprintf(
-      outFILE,
-      "    o Fasta file with HA sequence to check\n"
-   );
-   fprintf(
-   outFILE,
-   "    o HA sequence should have \"HA\" in the header (>)"
-   );
-   fprintf(outFILE, "\n");
 
    fprintf(outFILE, "  -HA2-start: [Not used]\n");
    fprintf(
@@ -544,5 +724,5 @@ void pHelpMesg(
      outFILE,
      "    o \"header\thi/low_path\tIs_P2_phe_or_try"
    );
-   fprintf(outFILE, "\tP1_to_P6_aa\n");
+   fprintf(outFILE, "\tP1_to_P6_aa\tH2start\"\n");
 } /*pHelpMesg*/

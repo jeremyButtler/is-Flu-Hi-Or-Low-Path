@@ -35,7 +35,7 @@
 #define HI_LOW_PATH_FUN_H
 
 #include <stdlib.h>
-#include "dataTypeShortHand.h"
+#include "alnSeq/dataTypeShortHand.h"
 #include "hiLowPathTbls.h"
 
 #define defNumPAA 6

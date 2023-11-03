@@ -28,7 +28,8 @@ python:
 
 debug:
 	$(CC) $(DEBUGFLAGS) $(source) -o hiLowDebug;
-	egdb -ex "b isHiLowPathFlu.c:142" -ex "r -HA2-start 1026 -fasta UP4-2018-bar07.fasta" hiLowDebug;
+	#egdb -ex "b isHiLowPathFlu.c:303" -ex "r -fasta pythonPkg/sequences.fasta" hiLowDebug;
+	egdb -ex "b isHiLowPathFlu.c:303" -ex "r -fasta pythonPkg/UP4-2018-bar07-NT.fasta" hiLowDebug;
 	rm hiLowDebug;
 
 install:

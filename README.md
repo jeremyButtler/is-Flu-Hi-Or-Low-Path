@@ -87,11 +87,23 @@ make pythonlocal
 
 ## Using the standalone
 
-This program has three options, but only two of the three
-  options will be used. The first option is the fasta file
-  (-fasta) to get the HA sequence from. This sequence needs
-  to have an **HA** in the header (Line with an **>**),
-  otherwise this program will not extract the HA sequence.
+This program has three options, but only one of the three
+  options is needed. The only required option is the fasta
+  file (-fasta) to get the HA sequence from. This program
+  will align each sequence in the fasta file to an
+  consensus of the last 3 bases of H1 and the first 54
+  bases of the HA2 gene
+  ("arrGGNHTNYHNrGNGCNDWHrYNrKNYKBAT"). However, this is
+  only as good as my consensus, so it will likely fail at
+  times. To fix this issue you can upload a feature table
+  or input the position of the first base (index 1) in the
+  HA2 gene (P1' position).
+
+If you are inputting a feature table or the first base in
+  HA2, then only one HA sequence is processed. You also
+  will need to mark the HA sequence in the fasta file with
+  **HA** in the header (Line with an **>**), otherwise
+  this program will not extract the HA sequence.
 
 The second option is either to use a feature table to get
   the HA2 starting position from (-tbl) or to manually
@@ -104,6 +116,10 @@ The second option is either to use a feature table to get
   before hand.
 
 ```
+isHiLowPathFlu -fasta HA.fasta;
+
+# or
+
 isHiLowPathFlu -fasta HA.fasta -tbl HA-feature-table.tbl;
 
 # or
@@ -154,10 +170,11 @@ You can put the c-string from getP1ToP6AA into
 
 ### getHA2Start.h
 
-getHA2Start.h has two functions, getHA2Start (Fun-01),
-  which gets the HA2 start position from a feature table
-  and getHaSeq (Fun-02), which gets an HA sequence from
-  a fasta file.
+getHA2Start.h has three functions, getHA2Start (Fun-01),
+  which gets the HA2 start position from a feature table,
+  getHaSeq (Fun-02), which gets an HA sequence from
+  a fasta file, and findHA2Start (Fun-03), which finds the
+  HA2 gene by aligning it to a consensus. 
 
 The getHA2Start function (Fun-01) takes in a path to a
   feature table and extracts and returns the starting
@@ -180,6 +197,49 @@ The getHaSeq function (Fun-02) takes in a fasta file and
 
   `getHaSeq(path_to_fasta_str);`
 
+The findHA2Start function (Fun-03) takes in the sequence
+  (c-string), the length of the sequence (index 1), a
+  pointer to the variable to hold the HA2 position on the
+  sequence, and a pointer to the variable to hold the first
+  mapped base in the consensus. The returned starting
+  positions are in index 0. Also, the HA2 starting position
+  on the sequence will included the last three bases of
+  HA1 (the P1 position). So, make sure to add three to the
+  starting position before calling getP1ToP6AA.
+
+The return value for findHA2Start is the score of the
+  alignment if it was kept. However, the score will be 0 if
+  it is under 40. The maximum score for the current
+  consensus is 63. It is -1 if there was a memory error.
+
+Two problems that might pop up is that a non-HA sequence
+  might align to my consensus or that my consensus may map
+  to a different position (not start of HA2). To reduce
+  this down I would recommend discarding any sequence that
+  does not map to the entire consensus.
+  
+  ```
+  score = findHA2Start(sequence, sequence_length, HA2_start, first_consensus_base);`
+
+  if(score < 0)
+     Handle memory errors here
+
+  if(score == 0)
+     Handle unmapped alignments here
+
+  if(first_consensus_base > 0)
+     Handle mistaken alignments here
+
+     /*If first_consensus_base is over 3, then you do not
+     `  have the P1' position. If over 0 suggests you may
+     `  missed or have an incomplete P1 position.
+     */
+
+  HA2_start += 3; /*Move to the P1' position'
+
+  getP1ToP6AA(sequence, HAS_start);
+  ```
+
 ## Using this code in python
 
 One note I should make. I am assuming if you are coding
@@ -193,10 +253,11 @@ First make sure you build the library (`make pythonlocal`
   or `sudo make python`). Otherwise, you will not be able
   to use this library in python.
 
-In python import the library and the one function you will
-  use `from checkFluHiOrLowPath import hiOrLowPathHA`. Then
-  provide the sequence and the position of the first base
-  in the H2A segment (at index 0) or the path to the
+In python import the library and the one function or two
+  functions you will use
+  `from checkFluHiOrLowPath import hiOrLowPathHA` or
+  Then provide the sequence and the position of the first
+  base in the H2A segment (at index 0) or the path to the
   feature table to the function.
 
 The return value will be a list with the first element
@@ -205,12 +266,41 @@ The return value will be a list with the first element
   sequence. The second element (ret[1]) is True if P2 is an
   Phenylalanine or an Tyrosine.
 
+You can try to find the HA2 starting position with
+  findHA2StartPos, which is a wrapper for findHA2Start
+  (Fun-03) in the getHA2Start.h code. Import findHA2 start
+  with `from checkFluHiOrLowPath import findHA2StartPos`.
+  The only parameter in the this function is the sequence.
+  The return value is a list with the first element as
+  the starting position at index 0 (ret[0]) and the second
+  element as the score (ret[1]). The starting position is
+  set to -1 if the sequence had a low score and -2 if the
+  of the P1 position could not be mapped.
+
+One warning about findHA2Start is that it is dependent on
+  how well I made the HA2 consensus sequence. So, it can
+  detect false positives, may get the wrong position
+  (assign another position to the HA2 position), or may
+  even think the sequence is not an HA gene. This
+
+
 ```
+from checkFluHiOrLowPath import hiOrLowPathHA, findHA2StartPos
+
+# Alternative 1 (Use the HA2 start position)
+
 retAry = hiOrLowPathHA(seq = HA_sequence, HA2Start = HA2_Position);
 
-# or
+# Alternative 2 (Use a feature table)
 
 retAry = hiOrLowPathHA(seq = HA_sequence, tbl = "/path/to/HA2_Feature_table");
+
+# Alternative 3 (Find the HA2 start position)
+
+HA2PosAry = findHA2StartPos(sequence);
+
+if(HA2PosAry[0] > 0):
+   retAry = hiOrLowPathHA(seq = sequence, HA2Start = HA2PosAry[0]);
 
 print(retAry[0]); # Is this a high path sequence
 print(retAry[3]); # ammino acids at P1 to P6
@@ -220,15 +310,6 @@ You can check pythonPkg/test.py for a hard coded example of
   how a script might look. You also have two .fasta files
   and their feature tables (.tbl) in pythonPkg you can test
   out.
-
-# Future directions
-
-I might try to see if there is a consensus for the start of
-  the HA2 region of the HA. This would allow me to find the
-  first base of the HA2 region using a Waterman Smith
-  alignment. Thus allowing me to detect the first base in
-  the HA2 region without requiring a feature table or user
-  input. That is all I have planned at the moment.
 
 # Thanks
 
