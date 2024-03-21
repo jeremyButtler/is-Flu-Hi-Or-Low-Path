@@ -1,0 +1,13 @@
+>Feature LC316691.1
+17	1717	gene		
+			gene	HA
+17	1717	CDS		
+			product	hemagglutinin
+			function	receptor binding and fusion protein
+			gene	HA
+17	64	sig_peptide
+65	1048	mat_peptide
+			product HA1
+1049	1714	mat_peptide
+			product HA2
+    

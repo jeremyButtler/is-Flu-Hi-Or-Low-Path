@@ -1,0 +1,13 @@
+>Feature MT406777
+33	1733	gene		
+			gene	HA
+33	1733	CDS		
+			product	hemagglutinin
+			function	receptor binding and fusion protein
+			gene	HA
+33	83	sig_peptide
+84	1064	mat_peptide
+			product HA1
+1065	1730	mat_peptide
+			product HA2
+    
