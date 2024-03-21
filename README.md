@@ -9,9 +9,9 @@ This program checks patterns that other people have found
   distinguish between high path and low path flu strains.
   Each pattern starts from the P1' site (first amino acid
   in HA2) and ends with the P3 site (P1'-P1-P2-P3). The
-  output tells if the strain was a high (high_path) or low
-  (low_path) strain. The output also prints out the P1 to
-  P6 amino acids and if there was a Phenylalanine or
+  output tells if the strain was a high (high\_path) or
+  low (low\_path) strain. The output also prints out the
+  P1 to P6 amino acids and if there was a Phenylalanine or
   Tryosine at the P2. Sun et al., 2010 found a
   Phenylalanine or Tryosine at the P2 position made at
   least one low path H1N1 more virulant.
@@ -34,8 +34,10 @@ Also, I should note that I am not a flu person. I just
   heard people might be interested in a program like this.
   And that there used to be one, but it disappeared.
 
-This code is licensed under two licenses, MIT and CC0. Pick
-  the licenses that works best for you.
+This code is licensed under two licenses, the unlicense
+  (public domain license) or MIT in cases were the
+  unlicense can not be used. You are free to choose the
+  license you want.
 
 ## Updates
 
