@@ -2,42 +2,47 @@ PREFIX=/usr/local/bin
 
 CC=cc
 
-CFLAGS+=\
-   -O3\
-   --std=c89\
-   -Wall\
+CFLAGS= \
+   -O3 \
+   -std=c89 \
+   -Wall \
+   -Wextra \
    -static
 
 MACCFLAGS=\
    -O3
 
-DEBUGFLAGS+=\
+DEBUGFLAGS=\
    -ggdb\
+   -g \
    -O0\
    -Wall\
-   --std=c89\
+   -Wextra \
+   -std=c89\
    -static
 
 SOURCE=\
-   isHiLowPathFlu.c
+   memwater/alnSetST.c \
+   memwater/seqST.c \
+   memwater/memwater.c \
+   haStart.c \
+   haPath.c \
+   getHaPath.c
 
 all:
-	$(CC) $(CFLAGS) $(SOURCE) -o isHiLowPathFlu;
+	$(CC) $(CFLAGS) $(SOURCE) -o getHaPath;
 
 mac:
-	$(CC) $(MACCFLAGS) $(SOURCE) -o isHiLowPathFlu;
+	$(CC) $(MACCFLAGS) $(SOURCE) -o getHaPath;
 
-pythonlocal:
-	CC="$(CC)" make -C pythonPkg pythonlocal;
-python:
-	CC="$(CC)" make -C pythonPkg python;
+#pythonlocal:
+#	CC="$(CC)" make -C pythonPkg pythonlocal;
+#python:
+#	CC="$(CC)" make -C pythonPkg python;
 
-debug:
-	$(CC) $(DEBUGFLAGS) $(source) -o hiLowDebug;
-	#egdb -ex "b isHiLowPathFlu.c:303" -ex "r -fasta pythonPkg/sequences.fasta" hiLowDebug;
-	egdb -ex "b isHiLowPathFlu.c:303" -ex "r -fasta pythonPkg/UP4-2018-bar07-NT.fasta" hiLowDebug;
-	rm hiLowDebug;
+check:
+	$(CC) $(DEBUGFLAGS) $(SOURCE) -o getHaPath;
 
 install:
-	mv isHiLowPathFlu $(PREFIX);
-	chmod a+x $(PREFIX)/isHiLowPathFlu;
+	mv getHaPath $(PREFIX);
+	chmod a+x $(PREFIX)/getHaPath;

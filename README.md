@@ -41,8 +41,11 @@ This code is licensed under two licenses, the unlicense
 
 ## Updates
 
-At some point I need to update alnSeq. I have it a few
-  versions past the version here.
+*20240627*: Updated the waterman aligner and changed some
+  of the coding style. The complied program name is
+  shorter (getHaPath). The python library support has not
+  been updated and so is no longer present.
+  See 2024-03-21-code for the old version.
 
 *20240321*: I fixed a minor error in my codon table 
   "hiLowPathTbls.h" were Phenylalanine was confused with
@@ -81,30 +84,27 @@ Zhirnov OP, Ikizler MR, Wright PF. Cleavage of influenza a
 
 # Building isHiLowPathFlu
 
-## Building Standalone
+## Mac/building non-static
+
+```
+make mac
+sudo make install
+```
+
+## Building static
 
 ```
 make
 sudo make install
 ```
 
-## Building the python library
-
-```
-# Global
-sudo make python
-
-# Local
-make pythonlocal
-```
-
-# Using this isHiLowPathFlu
+# Using getHaPath:
 
 ## Using the standalone
 
 This program has three options, but only one of the three
   options is needed. The only required option is the fasta
-  file (-fasta) to get the HA sequence from. This program
+  file (-fa) to get the HA sequence from. This program
   will align each sequence in the fasta file to an
   consensus of the last 3 bases of H1 and the first 54
   bases of the HA2 gene
@@ -131,200 +131,73 @@ The second option is either to use a feature table to get
   before hand.
 
 ```
-isHiLowPathFlu -fasta HA.fasta;
+getHaPath -fa HA.fasta;
 
 # or
 
-isHiLowPathFlu -fasta HA.fasta -tbl HA-feature-table.tbl;
+getHaPath -fa HA.fasta -tbl HA-feature-table.tbl;
 
 # or
 
-isHiLowPathFlu -fasta HA.fasta -HA2Start 1026;
+getHaPath -fa HA.fasta -HA2Start 1026;
 ```
 
 ## Using this code in C
 
 There are two main .h files in this code you will needed
-  to know about. The first is hiLowPathFun.h, which
+  to know about. The first is haPath.c/h, which
   contains the functions to get the amino acids and
   determines if a result matches a pattern. The second is
-  getHA2Start.h, which is used to get the HA2 starting
+  haStart.h, which is used to get the HA2 starting
   position from a feature table and to find the HA sequence
   in a fasta file.
 
-All the other .h files are dependencies these two .h files
-  depend on. These files have the dependencies they used
-  listed in the first comment block; under the Libraries
-  section at the start of each file.
+All the other files are dependencies these two .h files
+  depend on. Or in the case of some files in generalLib,
+  stuff I was to lazy to delete (copied from getDIids).
 
-### hiLowPathFun.h
+### haStart.c/h
 
-hiLowPathFun.h has a function named getP1ToP6AA (Fun-03),
-  which gets the P1 to P6 amino acid sequences from the HA
-  sequence. Its input is the HA sequence and the position
-  of the first base (as index 0) in the HA2 sequence. Its
-  return is an c-string with six amino acids (P1 to P6; in
-  lower case).
+haStart.c/h is set up to find the starting position of
+  the HA2 ORF in the sequence. You can use find_haStart
+  (fun03 haStart.c/h) to find the starting position using
+  a Waterman Smith alignment.
 
-  `getP1ToP6AA(HA_sequence_str, HA2_start_UL);`
+- Input:
+  - seqStruct with sequence to get get HA2 postion
+    - free with freeHeap_seqST(); fun09 memwater/seqST.c/h
+    - read in fasta sequence with getFqSeq_seqST()
+      (fun03 memwater/seqST.c/h)
+      - Input: file and seqStruct
+      - returns 0 for success
+      - returns 1 (def_EOF_seqST) for EOF
+      - other values are errors
+  - alnSet structure with the alignment settings
+  - variable to hold start of HA2 ORF in sequence
+  - variable to hold first HA2 mapped base in sequence
 
-You can put the c-string from getP1ToP6AA into
-  isHiOrLowPath(cString) (Fun-01) or isP2PheTryMut(cString)
-  (Fun-02). isHiOrLowPath returns a 1 if the c-string has
-  a high path sequence and 0 if it has a low path sequence.
-  isP2PheTryMut returns a 1 if P2 is a Phenylalanine or an
-  Tyrosine and 0 if it is not.
+### haPath.c/h
 
-  ```
-  if(getHA2Start(p1_to_p6_amino_acids_str) == 1)
-     return "high_path";
+haPath.c/h converts the HA2 P1 to P6 positions into amino
+  acids with getP1_P6AA_haPath (fun03).
 
-  if(isP2PheTryMut(p1_to_p6_amino_acids_str) == 1)
-     return "p2_is_an_phe_or_try";
-  ```
+- Input:
+  - seqStruct with the HA sequence and position
+  - array to hold P1 to P6 positions (length is 7)
+  - first base (index 0) in HA2
+    - use find_haStart (fun02 haStart.c/h) to get this
 
-### getHA2Start.h
+- Output:
+  - adds P1 to P6 aa sequences to input P1 to P6 array
 
-getHA2Start.h has three functions, getHA2Start (Fun-01),
-  which gets the HA2 start position from a feature table,
-  getHaSeq (Fun-02), which gets an HA sequence from
-  a fasta file, and findHA2Start (Fun-03), which finds the
-  HA2 gene by aligning it to a consensus. 
+You can then use the P1 to P6 array and find_haPath (fun02
+  haPath.h) to detect hi path HA sequences.
 
-The getHA2Start function (Fun-01) takes in a path to a
-  feature table and extracts and returns the starting
-  position of the HA2 peptide, if it is present. If their
-  is no HA2 peptide, it returns 0.
+- Input:
+  - P1 to P6 array used with getP1_P6AA_haPath
 
-  `H2_start_position_UL = getHA2Start(feature_table_Str);`
-   
-The getHaSeq function (Fun-02) takes in a fasta file and
-  extracts the first sequence it finds with an "HA" in the
-  header ">" entry. It changes the position in the file
-  to the next sequence after the extracted HA sequence.
-  The return value is an pointer to an seqStruct
-  (Struct-01 seqStruct.h) or 0 if no sequence was
-  extracted. This seqStruct needs to be freed with
-  `freeSeqST(seqStruct, 1);` (Fun-07 seqStruct.h) when you
-  are finished with the structure/program. You can access
-  or pass the sequence in the seqStruct to other functions
-  with seqStruct->seqCStr.
-
-  `getHaSeq(path_to_fasta_str);`
-
-The findHA2Start function (Fun-03) takes in the sequence
-  (c-string), the length of the sequence (index 1), a
-  pointer to the variable to hold the HA2 position on the
-  sequence, and a pointer to the variable to hold the first
-  mapped base in the consensus. The returned starting
-  positions are in index 0. Also, the HA2 starting position
-  on the sequence will included the last three bases of
-  HA1 (the P1 position). So, make sure to add three to the
-  starting position before calling getP1ToP6AA.
-
-The return value for findHA2Start is the score of the
-  alignment if it was kept. However, the score will be 0 if
-  it is under 40. The maximum score for the current
-  consensus is 63. It is -1 if there was a memory error.
-
-Two problems that might pop up is that a non-HA sequence
-  might align to my consensus or that my consensus may map
-  to a different position (not start of HA2). To reduce
-  this down I would recommend discarding any sequence that
-  does not map to the entire consensus.
-  
-  ```
-  score = findHA2Start(sequence, sequence_length, HA2_start, first_consensus_base);`
-
-  if(score < 0)
-     Handle memory errors here
-
-  if(score == 0)
-     Handle unmapped alignments here
-
-  if(first_consensus_base > 0)
-     Handle mistaken alignments here
-
-     /*If first_consensus_base is over 3, then you do not
-     `  have the P1' position. If over 0 suggests you may
-     `  missed or have an incomplete P1 position.
-     */
-
-  HA2_start += 3; /*Move to the P1' position'
-
-  getP1ToP6AA(sequence, HAS_start);
-  ```
-
-## Using this code in python
-
-One note I should make. I am assuming if you are coding
-  this that you know what index 0 means. If you do not
-  know what index 0 is, it means that you are starting your
-  count at 0 instead of 1. So, the first item is 0, the
-  second item is 1, the third item is 2, ..., and the nth
-  item is n - 1.
-
-First make sure you build the library (`make pythonlocal`
-  or `sudo make python`). Otherwise, you will not be able
-  to use this library in python.
-
-In python import the library and the one function or two
-  functions you will use
-  `from checkFluHiOrLowPath import hiOrLowPathHA` or
-  Then provide the sequence and the position of the first
-  base in the H2A segment (at index 0) or the path to the
-  feature table to the function.
-
-The return value will be a list with the first element
-  (ret[0]) being True if high path or False if low path.
-  The third element (ret[2]) is the P1 to P6 amino acid
-  sequence. The second element (ret[1]) is True if P2 is an
-  Phenylalanine or an Tyrosine.
-
-You can try to find the HA2 starting position with
-  findHA2StartPos, which is a wrapper for findHA2Start
-  (Fun-03) in the getHA2Start.h code. Import findHA2 start
-  with `from checkFluHiOrLowPath import findHA2StartPos`.
-  The only parameter in the this function is the sequence.
-  The return value is a list with the first element as
-  the starting position at index 0 (ret[0]) and the second
-  element as the score (ret[1]). The starting position is
-  set to -1 if the sequence had a low score and -2 if the
-  of the P1 position could not be mapped.
-
-One warning about findHA2Start is that it is dependent on
-  how well I made the HA2 consensus sequence. So, it can
-  detect false positives, may get the wrong position
-  (assign another position to the HA2 position), or may
-  even think the sequence is not an HA gene. This
-
-
-```
-from checkFluHiOrLowPath import hiOrLowPathHA, findHA2StartPos
-
-# Alternative 1 (Use the HA2 start position)
-
-retAry = hiOrLowPathHA(seq = HA_sequence, HA2Start = HA2_Position);
-
-# Alternative 2 (Use a feature table)
-
-retAry = hiOrLowPathHA(seq = HA_sequence, tbl = "/path/to/HA2_Feature_table");
-
-# Alternative 3 (Find the HA2 start position)
-
-HA2PosAry = findHA2StartPos(sequence);
-
-if(HA2PosAry[0] > 0):
-   retAry = hiOrLowPathHA(seq = sequence, HA2Start = HA2PosAry[0]);
-
-print(retAry[0]); # Is this a high path sequence
-print(retAry[3]); # ammino acids at P1 to P6
-```
-
-You can check pythonPkg/test.py for a hard coded example of
-  how a script might look. You also have two .fasta files
-  and their feature tables (.tbl) in pythonPkg you can test
-  out.
+- Output:
+  - returns 1 if was a high path sequence
 
 # Thanks
 
@@ -341,7 +214,3 @@ You can check pythonPkg/test.py for a hard coded example of
   the questions, but I benefit from other people asking.
   Thanks to all the people who took time to answer a
   question, ask a question, or post a tutorial.
-
-# Funding
-
-- Will add in later.
